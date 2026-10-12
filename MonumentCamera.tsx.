@@ -1,4 +1,4 @@
-
+```tsx
 import { useEffect, useRef, useState } from "react";
 
 type MonumentCameraProps = {
@@ -13,13 +13,6 @@ export default function MonumentCamera({
 
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState("");
-
-  useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
 
   async function startCamera() {
     setError("");
@@ -28,19 +21,13 @@ export default function MonumentCamera({
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error(
-          "Camera access requires HTTPS or localhost in a supported browser."
+          "Camera is unavailable. Please use localhost or HTTPS."
         );
       }
 
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-
       const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
         audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
       });
 
       streamRef.current = stream;
@@ -50,19 +37,21 @@ export default function MonumentCamera({
         await videoRef.current.play();
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unable to open the camera.";
-      setError(message);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not access the camera."
+      );
     } finally {
       setStarting(false);
     }
   }
 
-  async function captureImage() {
+  function capturePhoto() {
     const video = videoRef.current;
 
     if (!video || !video.videoWidth || !video.videoHeight) {
-      setError("Wait until the camera preview is ready.");
+      setError("Start the camera and wait for the preview first.");
       return;
     }
 
@@ -73,82 +62,65 @@ export default function MonumentCamera({
     const context = canvas.getContext("2d");
 
     if (!context) {
-      setError("Could not capture the image. Please try again.");
+      setError("Could not capture the image.");
       return;
     }
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(video, 0, 0);
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", 0.9);
-    });
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setError("Could not create the photo.");
+        return;
+      }
 
-    if (!blob) {
-      setError("Image capture failed. Please try again.");
-      return;
-    }
+      const image = new File([blob], "monument.jpg", {
+        type: "image/jpeg",
+      });
 
-    const image = new File([blob], "monument-capture.jpg", {
-      type: "image/jpeg",
-    });
-
-    setPreviewUrl(URL.createObjectURL(blob));
-    onCapture(image);
-  }
-
-  function retake() {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl("");
-    setError("");
+      onCapture(image);
+    }, "image/jpeg", 0.9);
   }
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, [previewUrl]);
+  }, []);
 
   return (
-    <section className="monument-camera">
-      {previewUrl ? (
-        <img
-          src={previewUrl}
-          alt="Captured monument"
-          style={{ width: "100%", borderRadius: 16 }}
-        />
-      ) : (
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          aria-label="Live monument camera preview"
-          style={{
-            width: "100%",
-            minHeight: 240,
-            objectFit: "cover",
-            background: "#171717",
-            borderRadius: 16,
-          }}
-        />
+    <div className="mx-auto w-full max-w-xl space-y-4">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="w-full rounded-xl border border-yellow-600 bg-black"
+      />
+
+      {error && (
+        <p className="text-sm text-red-400">{error}</p>
       )}
 
-      {error && <p role="alert">{error}</p>}
-
-      {!previewUrl ? (
-        <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-          <button type="button" onClick={startCamera} disabled={starting}>
-            {starting ? "Opening camera..." : "Start camera"}
-          </button>
-          <button type="button" onClick={captureImage}>
-            Capture monument
-          </button>
-        </div>
-      ) : (
-        <button type="button" onClick={retake}>
-          Retake photo
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={startCamera}
+          disabled={starting}
+          className="rounded-lg bg-yellow-500 px-5 py-3 font-semibold text-black disabled:opacity-50"
+        >
+          {starting ? "Starting camera..." : "Start Camera"}
         </button>
-      )}
-    </section>
+
+        <button
+          type="button"
+          onClick={capturePhoto}
+          className="rounded-lg border border-yellow-600 px-5 py-3 text-yellow-400"
+        >
+          Capture Photo
+        </button>
+      </div>
+    </div>
   );
 }
+```
