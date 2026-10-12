@@ -73,6 +73,18 @@ export default function Scan() {
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} aria-label="Upload heritage image" />
                 </div>
               </div>
+              <div className="heritage-card p-4 space-y-3">
+                <h2 className="text-stone-100 font-semibold">
+                  Scan with your camera
+                </h2>
+
+                <MonumentCamera
+                  onCapture={(image) => {
+                    setPreviewUrl(URL.createObjectURL(image));
+                    runRecognition(image);
+                  }}
+                />
+              </div>
               <div className="heritage-card p-4">
                 <div className="flex items-center gap-2 mb-3"><Badge variant="gold">Demo Mode</Badge><p className="text-stone-400 text-xs">Try recognizing these demo images</p></div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -149,12 +161,7 @@ export default function Scan() {
               <Button variant="gold" onClick={reset} icon={<Camera className="h-4 w-4" />}>Try Again</Button>
             </motion.div>
           )}
-          <MonumentCamera
-  onCapture={(image) => {
-    // The next step sends this File to your AI recognition API.
-    console.log("Captured image:", image.name, image.size);
-  }}
-/>
+          
         </AnimatePresence>
       </div>
     </div>
