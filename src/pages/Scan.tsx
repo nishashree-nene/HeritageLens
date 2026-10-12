@@ -8,6 +8,7 @@ import { DEMO_SITES } from '../data/demo/heritage-sites';
 import { identifyHeritage, recognizeFromDemoImage, PROCESSING_STAGES } from '../services/ai/heritageRecognition';
 import { useAppStore } from '../store/appStore';
 import type { RecognitionResult } from '../types';
+import MonumentCamera from "../components/heritage/MonumentCamera";
 
 type ScanState = 'idle' | 'processing' | 'result' | 'error';
 
