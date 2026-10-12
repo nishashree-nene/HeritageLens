@@ -149,6 +149,12 @@ export default function Scan() {
               <Button variant="gold" onClick={reset} icon={<Camera className="h-4 w-4" />}>Try Again</Button>
             </motion.div>
           )}
+          <MonumentCamera
+  onCapture={(image) => {
+    // The next step sends this File to your AI recognition API.
+    console.log("Captured image:", image.name, image.size);
+  }}
+/>
         </AnimatePresence>
       </div>
     </div>
