@@ -13,6 +13,7 @@ export default function MonumentCamera({
 
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [cameraOn, setCameraOn] = useState(false);
 
   async function startCamera() {
     setError("");
@@ -21,27 +22,43 @@ export default function MonumentCamera({
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error(
-          "Camera is unavailable. Please use localhost or HTTPS."
+          "Camera access is unavailable. Open the site using localhost or HTTPS."
         );
       }
 
+      // Stop any previous camera stream.
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: true,
         audio: false,
       });
 
       streamRef.current = stream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      const video = videoRef.current;
+      if (!video) {
+        throw new Error("Camera preview element was not found.");
       }
+
+      video.srcObject = stream;
+      await video.play();
+      setCameraOn(true);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not access the camera."
-      );
+      setCameraOn(false);
+
+      const cameraError = err as DOMException;
+      if (cameraError.name === "NotAllowedError") {
+        setError("Camera permission denied. Allow camera access in your browser settings.");
+      } else if (cameraError.name === "NotFoundError") {
+        setError("No camera was found on this device.");
+      } else if (cameraError.name === "NotReadableError") {
+        setError("Camera is busy. Close other apps using the camera and try again.");
+      } else {
+        setError(
+          err instanceof Error ? err.message : "Could not start the camera."
+        );
+      }
     } finally {
       setStarting(false);
     }
@@ -51,7 +68,7 @@ export default function MonumentCamera({
     const video = videoRef.current;
 
     if (!video || !video.videoWidth || !video.videoHeight) {
-      setError("Start the camera and wait for the preview first.");
+      setError("Start the camera and wait until the live video appears.");
       return;
     }
 
@@ -60,9 +77,8 @@ export default function MonumentCamera({
     canvas.height = video.videoHeight;
 
     const context = canvas.getContext("2d");
-
     if (!context) {
-      setError("Could not capture the image.");
+      setError("Could not capture the photo.");
       return;
     }
 
@@ -74,11 +90,9 @@ export default function MonumentCamera({
         return;
       }
 
-      const image = new File([blob], "monument.jpg", {
+      onCapture(new File([blob], "monument.jpg", {
         type: "image/jpeg",
-      });
-
-      onCapture(image);
+      }));
     }, "image/jpeg", 0.9);
   }
 
@@ -95,11 +109,13 @@ export default function MonumentCamera({
         autoPlay
         playsInline
         muted
-        className="w-full rounded-xl border border-yellow-600 bg-black"
+        className="block w-full h-64 sm:h-80 rounded-xl border border-yellow-600 bg-black object-contain"
       />
 
       {error && (
-        <p className="text-sm text-red-400">{error}</p>
+        <p role="alert" className="rounded-lg bg-red-950 p-3 text-sm text-red-300">
+          {error}
+        </p>
       )}
 
       <div className="flex flex-wrap gap-3">
@@ -109,13 +125,14 @@ export default function MonumentCamera({
           disabled={starting}
           className="rounded-lg bg-yellow-500 px-5 py-3 font-semibold text-black disabled:opacity-50"
         >
-          {starting ? "Starting camera..." : "Start Camera"}
+          {starting ? "Starting camera..." : cameraOn ? "Restart Camera" : "Start Camera"}
         </button>
 
         <button
           type="button"
           onClick={capturePhoto}
-          className="rounded-lg border border-yellow-600 px-5 py-3 text-yellow-400"
+          disabled={!cameraOn}
+          className="rounded-lg border border-yellow-600 px-5 py-3 text-yellow-400 disabled:opacity-40"
         >
           Capture Photo
         </button>
