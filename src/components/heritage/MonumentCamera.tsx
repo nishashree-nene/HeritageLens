@@ -1,4 +1,4 @@
-```tsx
+
 import { useEffect, useRef, useState } from "react";
 
 type MonumentCameraProps = {
@@ -140,4 +140,3 @@ export default function MonumentCamera({
     </div>
   );
 }
-```

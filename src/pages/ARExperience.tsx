@@ -1,169 +1,169 @@
-import { useState, useRef, useEffect } from 'react';
+/**
+ * AR Experience / 3D Explorer Page — Feature D
+ *
+ * Uses React Three Fiber (Heritage3DViewer) with:
+ * - Model registry (GLTF or procedural fallback)
+ * - Annotation hotspots
+ * - Historic / present toggle
+ * - Fullscreen
+ * - Site selector
+ */
+
+import { useEffect, Suspense } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import * as THREE from 'three';
-import { ArrowLeft, Info, X } from 'lucide-react';
-import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Info, MapPin, Clock, User, Box, ChevronRight } from 'lucide-react';
+import { Button }             from '../components/ui/Button';
+import { Badge }              from '../components/ui/Badge';
+import { Heritage3DViewer }   from '../components/heritage/Heritage3DViewer';
 import { DEMO_SITES, getArtifactsForSite } from '../data/demo/heritage-sites';
-import { useAppStore } from '../store/appStore';
+import { MODEL_REGISTRY, getModelForSite } from '../data/modelRegistry';
+import { useAppStore }        from '../store/appStore';
 
-function buildScene(historic: boolean): THREE.Scene {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(historic ? 0x1a1000 : 0x0d0d0d);
-  scene.fog = new THREE.Fog(scene.background as THREE.Color, 20, 60);
-  const main = historic ? 0xd97706 : 0x78716c, accent = historic ? 0xf59e0b : 0xa8a29e, glow = historic ? 0xfbbf24 : 0xd6d3d1;
-  scene.add(new THREE.AmbientLight(0xffffff, historic ? 1.0 : 0.7));
-  const dl = new THREE.DirectionalLight(historic ? 0xfbbf24 : 0xffffff, historic ? 1.5 : 1.2);
-  dl.position.set(5, 10, 5); scene.add(dl);
-  const pl = new THREE.PointLight(0xf59e0b, 0.5, 20); pl.position.set(-5, 5, -5); scene.add(pl);
-  scene.add(new THREE.GridHelper(20, 20, 0x2a2a2a, 0x1a1a1a) as unknown as THREE.Object3D);
-  const g = new THREE.Group();
-  const bm = new THREE.MeshStandardMaterial({ color: main, roughness: 0.8 });
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 4), bm)));
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.2, 2.5), new THREE.MeshStandardMaterial({ color: main, roughness: 0.7 }));
-  body.position.y = 0.75; g.add(body);
-  [1, 0.85, 0.7, 0.55, 0.4, 0.3, 0.22, 0.15].forEach((s, i) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(s * 2.5, 0.25, s * 2.5), new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? main : accent, roughness: 0.6 }));
-    m.position.y = 1.35 + i * 0.28; g.add(m);
-  });
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({ color: glow, emissive: new THREE.Color(glow), emissiveIntensity: historic ? 0.5 : 0.1, roughness: 0.3 }));
-  cap.position.y = 3.8; g.add(cap);
-  [-1.5, 1.5].forEach((x) => { const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2, 0.3), new THREE.MeshStandardMaterial({ color: accent, roughness: 0.7 })); p.position.set(x, 0.8, 2.2); g.add(p); });
-  scene.add(g);
-  return scene;
-}
-
-function ThreeCanvas({ mode }: { mode: 'current' | 'past' | 'compare' }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef(0);
-  const rotRef = useRef(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const w = canvas.parentElement?.clientWidth || 800, h = canvas.parentElement?.clientHeight || 500;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(w, h);
-    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
-    camera.position.set(0, 4, 10); camera.lookAt(0, 2, 0);
-    let isDragging = false, prevX = 0, extraRot = 0;
-    const onDown = (e: MouseEvent) => { isDragging = true; prevX = e.clientX; };
-    const onMove = (e: MouseEvent) => { if (isDragging) { extraRot += (e.clientX - prevX) * 0.01; prevX = e.clientX; } };
-    const onUp = () => { isDragging = false; };
-    canvas.addEventListener('mousedown', onDown); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-    const scenes = mode === 'compare' ? [buildScene(false), buildScene(true)] : [buildScene(mode === 'past')];
-    const animate = () => {
-      animRef.current = requestAnimationFrame(animate);
-      rotRef.current += 0.003;
-      const r = rotRef.current + extraRot;
-      camera.position.set(Math.sin(r) * 8, 4, Math.cos(r) * 8); camera.lookAt(0, 2, 0);
-      if (mode === 'compare' && scenes.length === 2) {
-        renderer.setScissorTest(true);
-        const half = Math.floor(w / 2);
-        renderer.setViewport(0, 0, half, h); renderer.setScissor(0, 0, half, h); renderer.render(scenes[0], camera);
-        renderer.setViewport(half, 0, half, h); renderer.setScissor(half, 0, half, h); renderer.render(scenes[1], camera);
-        renderer.setScissorTest(false);
-      } else { renderer.render(scenes[0], camera); }
-    };
-    animate();
-    const onResize = () => { const nw = canvas.parentElement?.clientWidth || 800, nh = canvas.parentElement?.clientHeight || 500; renderer.setSize(nw, nh); camera.aspect = nw / nh; camera.updateProjectionMatrix(); };
-    window.addEventListener('resize', onResize);
-    return () => { cancelAnimationFrame(animRef.current); canvas.removeEventListener('mousedown', onDown); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); window.removeEventListener('resize', onResize); renderer.dispose(); };
-  }, [mode]);
-
-  return <canvas ref={canvasRef} className="w-full h-full" aria-label="3D heritage model — drag to rotate" />;
+function Loader() {
+  return (
+    <div className="flex items-center justify-center h-[480px] rounded-2xl border border-stone-800 bg-stone-950">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-full border-2 border-yellow-500/30 border-t-yellow-500 animate-spin" />
+        <p className="text-stone-500 text-sm">Loading 3D scene…</p>
+      </div>
+    </div>
+  );
 }
 
 export default function ARExperience() {
   const [searchParams] = useSearchParams();
   const siteId = searchParams.get('site') || 'site-001';
   const { language, earnBadge } = useAppStore();
-  const site = DEMO_SITES.find((s) => s.id === siteId) || DEMO_SITES[0];
+
+  const site  = DEMO_SITES.find((s) => s.id === siteId) ?? DEMO_SITES[0];
+  const entry = getModelForSite(site.id) ?? MODEL_REGISTRY[0];
   const artifacts = getArtifactsForSite(site.id);
-  const [mode, setMode] = useState<'current' | 'past' | 'compare'>('current');
-  const [infoOpen, setInfoOpen] = useState(false);
-  const [selectedArtifact, setSelectedArtifact] = useState<string | null>(null);
-  const name = language === 'ta' ? site.name_ta : site.name_en;
-  useEffect(() => { earnBadge('badge-002'); }, []);
+  const name  = language === 'ta' ? site.name_ta : site.name_en;
+
+  useEffect(() => { earnBadge('badge-002'); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen pt-16 pb-24 bg-stone-950">
+    <div className="min-h-screen pt-16 pb-28 bg-stone-950">
+      {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800">
-        <Link to={`/heritage/${site.slug}`} className="flex items-center gap-2 text-stone-400 hover:text-stone-200 text-sm"><ArrowLeft className="h-4 w-4" />Back</Link>
-        <div className="flex items-center gap-2"><span className="text-stone-400 text-sm hidden sm:block">{name}</span><Badge variant="ar">AR / 3D Demo</Badge></div>
-        <button onClick={() => setInfoOpen(true)} className="p-2 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-white/5" aria-label="Info"><Info className="h-4 w-4" /></button>
+        <Link to={`/heritage/${site.slug}`} className="flex items-center gap-2 text-stone-400 hover:text-stone-200 text-sm transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Link>
+        <div className="flex items-center gap-2">
+          <span className="text-stone-400 text-sm hidden sm:block truncate max-w-[200px]">{name}</span>
+          <Badge variant="ar">3D Explorer</Badge>
+        </div>
+        <Link to={`/see-the-past/${site.slug}`} className="text-yellow-400 hover:text-yellow-300 text-xs font-semibold transition-colors">
+          See the Past →
+        </Link>
       </div>
-      <div className="px-4 py-2 bg-stone-900/60 border-b border-stone-800"><p className="text-xs text-stone-500 text-center">🔮 <strong>3D Demo</strong> — Procedural Three.js model. Replace with real GLB/GLTF models for production.</p></div>
-      <div className="relative h-[55vh] bg-gradient-to-b from-stone-950 to-stone-950 overflow-hidden">
-        <ThreeCanvas mode={mode} />
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none"><div className="glass rounded-full px-4 py-2"><p className="text-yellow-400 text-xs font-bold uppercase tracking-wider">{mode === 'current' ? '📅 Current State' : mode === 'past' ? `🏛️ ${site.construction_date || 'Historical'}` : '⚖️ Compare View'}</p></div></div>
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none"><p className="text-stone-600 text-xs">Drag to rotate</p></div>
+
+      {/* Notice bar */}
+      <div className="px-4 py-2 bg-stone-900/60 border-b border-stone-800">
+        <p className="text-xs text-stone-500 text-center">
+          {entry.modelUrl
+            ? `🏛️ GLTF model loaded · ${entry.license ?? 'Licensed for educational use'}`
+            : '🔧 Procedural model shown. Drop a real .glb into public/models/ and update modelRegistry.ts.'}
+        </p>
       </div>
-      <div className="px-4 py-4 border-b border-stone-800">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {(['current', 'past', 'compare'] as const).map((m) => (
-            <button key={m} onClick={() => setMode(m)} className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-yellow-500 text-black' : 'glass text-stone-300 hover:text-stone-100'}`}>{m === 'current' ? '📅 Current' : m === 'past' ? '🏛️ Historical' : '⚖️ Compare'}</button>
+
+      {/* 3D Viewer */}
+      <div className="px-4 pt-4 pb-2">
+        <Suspense fallback={<Loader />}>
+          <Heritage3DViewer entry={entry} />
+        </Suspense>
+      </div>
+
+      {/* Site selector tabs */}
+      <div className="px-4 py-3 border-b border-stone-800 overflow-x-auto">
+        <div className="flex gap-2 min-w-max">
+          {DEMO_SITES.map((s) => (
+            <Link
+              key={s.id}
+              to={`/ar?site=${s.id}`}
+              className={`flex-shrink-0 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                s.id === siteId
+                  ? 'bg-yellow-500 text-black'
+                  : 'glass text-stone-300 hover:text-stone-100'
+              }`}
+            >
+              {(language === 'ta' ? s.name_ta : s.name_en).split(',')[0]}
+            </Link>
           ))}
-          <Link to={`/see-the-past/${site.slug}`}><button className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold glass text-yellow-400 hover:text-yellow-300 transition-all">🎬 See the Past</button></Link>
         </div>
       </div>
+
+      {/* Info + annotations */}
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Site info card */}
         <div className="heritage-card p-5">
-          <h2 className="font-serif text-stone-100 text-lg mb-2">{name}</h2>
-          <p className="text-stone-400 text-sm leading-relaxed">{language === 'ta' ? site.description_ta : site.description_en}</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-stone-500"><div>📅 {site.historical_period}</div><div>👷 {site.builder}</div><div>🏛️ {site.dynasty}</div><div>📍 {site.location_name}</div></div>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h2 className="font-serif text-stone-100 text-lg">{name}</h2>
+            {site.is_unesco && <Badge variant="unesco">UNESCO</Badge>}
+          </div>
+          <p className="text-stone-400 text-sm leading-relaxed mb-4">
+            {language === 'ta' ? site.description_ta : site.description_en}
+          </p>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2 text-stone-500"><MapPin className="h-4 w-4 text-yellow-600" />{site.location_name}</div>
+            <div className="flex items-center gap-2 text-stone-500"><Clock className="h-4 w-4 text-yellow-600" />{site.historical_period}</div>
+            {site.builder && <div className="flex items-center gap-2 text-stone-500"><User className="h-4 w-4 text-yellow-600" />{site.builder}</div>}
+            <div className="flex items-center gap-2 text-stone-500"><Box className="h-4 w-4 text-yellow-600" />{entry.style}</div>
+          </div>
         </div>
-        {artifacts.length > 0 && (
+
+        {/* Annotations list */}
+        {entry.annotations.length > 0 && (
           <div>
-            <h3 className="font-serif text-stone-100 text-base mb-3">Artifacts & Elements</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {artifacts.map((art) => (
-                <button key={art.id} onClick={() => setSelectedArtifact(art.id)} className="heritage-card p-3 text-left group">
-                  <div className="relative overflow-hidden rounded-lg h-28 mb-2"><img src={art.image_url} alt={language === 'ta' ? art.name_ta : art.name_en} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1590169786462-7d54566b25b1?w=300&q=80'; }} /></div>
-                  <p className="text-stone-200 text-xs font-semibold">{language === 'ta' ? art.name_ta : art.name_en}</p>
-                  <p className="text-stone-600 text-xs">{art.historical_period}</p>
-                </button>
+            <h3 className="font-serif text-stone-100 text-base mb-3 flex items-center gap-2">
+              <Info className="h-4 w-4 text-yellow-500" />
+              Architectural Elements
+            </h3>
+            <div className="space-y-2">
+              {entry.annotations.map((ann) => (
+                <motion.div
+                  key={ann.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  className="flex gap-3 p-3 rounded-xl bg-stone-900 border border-stone-800"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500 flex-shrink-0 mt-1.5" />
+                  <div>
+                    <p className="text-yellow-400 text-xs font-bold uppercase tracking-wider mb-0.5">{ann.label}</p>
+                    <p className="text-stone-300 text-sm">{ann.note}</p>
+                  </div>
+                </motion.div>
               ))}
             </div>
           </div>
         )}
-        <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5"><p className="text-blue-400 text-xs font-semibold mb-1">WebXR AR Mode</p><p className="text-stone-500 text-xs">On supported devices (Chrome on Android), WebXR places the 3D model in your real environment. The Three.js viewer works as fallback on all devices.</p></div>
+
+        {/* Model info */}
+        <div className="p-4 rounded-xl border border-stone-800 bg-stone-900/40">
+          <p className="text-stone-400 text-xs font-semibold mb-1">3D Model Info</p>
+          <p className="text-stone-500 text-xs leading-relaxed">
+            {entry.modelUrl
+              ? `Source: ${entry.source ?? 'External'} · ${entry.license ?? ''}`
+              : `Procedural model for ${entry.name}. To use a real GLTF: download a CC0 model from Sketchfab or Smithsonian 3D, place it in public/models/, and set modelUrl in src/data/modelRegistry.ts.`}
+          </p>
+        </div>
+
+        {/* CTA row */}
+        <div className="flex gap-3 flex-wrap">
+          <Link to={`/see-the-past/${site.slug}`} className="flex-1 min-w-[140px]">
+            <Button variant="gold" className="w-full" icon={<ChevronRight className="h-4 w-4" />}>
+              See the Past
+            </Button>
+          </Link>
+          <Link to="/chat" className="flex-1 min-w-[140px]">
+            <Button variant="ghost" className="w-full">
+              Ask AI Guide
+            </Button>
+          </Link>
+        </div>
       </div>
-
-      <AnimatePresence>
-        {selectedArtifact && (() => {
-          const art = artifacts.find((a) => a.id === selectedArtifact);
-          if (!art) return null;
-          return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/70" onClick={() => setSelectedArtifact(null)} />
-              <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }} className="relative w-full max-w-md glass rounded-2xl overflow-hidden">
-                <img src={art.image_url} alt={language === 'ta' ? art.name_ta : art.name_en} className="w-full h-52 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1590169786462-7d54566b25b1?w=600&q=80'; }} />
-                <button onClick={() => setSelectedArtifact(null)} className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/50 text-white" aria-label="Close"><X className="h-4 w-4" /></button>
-                <div className="p-5"><h3 className="font-serif text-stone-100 text-lg mb-1">{language === 'ta' ? art.name_ta : art.name_en}</h3><p className="text-yellow-500 text-xs mb-3">{art.historical_period}</p><p className="text-stone-300 text-sm leading-relaxed">{language === 'ta' ? art.description_ta : art.description_en}</p>{art.source_reference && <p className="text-stone-600 text-xs mt-3">📚 {art.source_reference}</p>}</div>
-              </motion.div>
-            </div>
-          );
-        })()}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {infoOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60" onClick={() => setInfoOpen(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative w-full max-w-md glass rounded-2xl p-6">
-              <h3 className="font-serif text-stone-100 text-lg mb-3">AR / 3D Architecture</h3>
-              <div className="space-y-3 text-sm text-stone-400">
-                <p><strong className="text-stone-200">Level 1:</strong> Camera-style AR simulation</p>
-                <p><strong className="text-stone-200">Level 2:</strong> Three.js 3D viewer (active)</p>
-                <p><strong className="text-stone-200">Level 3:</strong> WebXR AR (requires HTTPS + compatible device)</p>
-                <div className="p-3 rounded-lg bg-stone-900 border border-stone-800 text-xs">Procedural model shown for demo. Replace with real .glb/.gltf via THREE.GLTFLoader.</div>
-              </div>
-              <Button variant="gold" className="w-full mt-4" onClick={() => setInfoOpen(false)}>Got it</Button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

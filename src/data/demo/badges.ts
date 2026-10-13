@@ -1,4 +1,4 @@
-vgimport type { Badge } from '../../types';
+import type { Badge } from '../../types';
 export const DEMO_BADGES: Badge[] = [
   { id: 'badge-001', name: 'First Discovery', description: 'Explored your first heritage site', icon: '🏛️', color: '#f59e0b' },
   { id: 'badge-002', name: 'AR Explorer', description: 'Experienced a site in augmented reality', icon: '🔮', color: '#8b5cf6' },

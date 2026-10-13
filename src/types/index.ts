@@ -110,8 +110,22 @@ export interface AIGuideResponse {
 }
 
 export interface RecognitionResult {
-  siteId: string; siteName: string; confidence: number; location: string;
-  period: string; isDemo: boolean; matchMethod: 'visual' | 'location' | 'demo';
+  siteId: string | null;
+  siteName: string;
+  confidence: number;
+  location: string;
+  period: string;
+  /** Rich fields returned by the AI backend */
+  overview?: string | null;
+  notable_facts?: string[];
+  architectural_style?: string | null;
+  builder?: string | null;
+  cultural_significance?: string | null;
+  visitor_info?: string | null;
+  is_heritage_site?: boolean;
+  isDemo: boolean;
+  matchMethod: 'visual' | 'location' | 'demo' | 'vision-ai';
+  provider?: string;
 }
 
 export interface MapMarker {

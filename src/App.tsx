@@ -10,6 +10,7 @@ const HeritageDetail = lazy(() => import('./pages/HeritageDetail'));
 const SeeThePast   = lazy(() => import('./pages/SeeThePast'));
 const ARExperience = lazy(() => import('./pages/ARExperience'));
 const Scan         = lazy(() => import('./pages/Scan'));
+const Chat         = lazy(() => import('./pages/Chat'));
 const MapPage      = lazy(() => import('./pages/MapPage'));
 const Learn        = lazy(() => import('./pages/Learn'));
 const Community    = lazy(() => import('./pages/Community'));
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="/see-the-past/:slug"       element={<SeeThePast />} />
               <Route path="/ar"                       element={<ARExperience />} />
               <Route path="/scan"                     element={<Scan />} />
+              <Route path="/chat"                     element={<Chat />} />
               <Route path="/map"                      element={<MapPage />} />
               <Route path="/learn"                    element={<Learn />} />
               <Route path="/community"                element={<Community />} />
